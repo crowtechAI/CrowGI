@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 from pathlib import Path
+import sys
 import openai
 
 openai.api_key = os.environ.get('OPENAI_API_KEY')
@@ -60,7 +61,7 @@ def analyze_code(file_path, engine, model_id):
     except openai.error.APIError as e:
         logging.error("Error analyzing code: %s", e)
         raise
-    suggestions = completion.choices[0].text.strip() if completion.choices else ''
+    suggestions = completion.choices[0].text.strip() if completion.choices else None
     return suggestions
 
 def execute_code(file_path):
@@ -75,8 +76,17 @@ def execute_code(file_path):
     """
     try:
         result = subprocess.run([sys.executable, file_path], capture_output=True, text=True, check=True)
+    except FileNotFoundError as e:
+        logging.error("File not found: %s", file_path)
+        return ''
     except subprocess.CalledProcessError as e:
         logging.error("Error executing code: %s", e)
+        return ''
+    except SyntaxError as e:
+        logging.error("Syntax error in file: %s", file_path)
+        return ''
+    except Exception as e:
+        logging.error("Unexpected error: %s", e)
         return ''
     output = result.stdout
     if result.stderr:
@@ -86,12 +96,33 @@ def execute_code(file_path):
 def improve_python_files(root_path: Path, engine: str, model_id: str) -> None:
     """
     Walks through all Python files within the directory and any subdirectories, analyzes the code for each file
-    and replaces any suggestionsImproveImprovements:
-- Line 14: `openai.api_key` should be set as an environment variable instead of hardcoding it.
-- Line 38: `completion.choices[0].text.strip()` should be checked for None before being stripped.
-- The `execute_code` function should be tested for various error conditions such as when the file does not exist, has syntax errors or runtime errors.
-- The `improve_python_files` function should handle exceptions thrown by `analyze_code` and `execute_code` appropriately so that it can continue processing other files.
-- It would be good to log which files have been analyzed and improved or failed to be improved.
-- It would be beneficial to add unit tests for each of the functions.
+    and replaces any suggestions.
 
-Updated Code:
+    Args:
+        root_path (Path): The path to the directory of interest
+        engine (str): The OpenAI engine to be used for code analysis
+        model_id (str): The ID for the GPT-3 model to be used for code analysis
+    """
+    for file_path in root_path.glob("**/*.py"):
+        try:
+            suggestions = analyze_code(file_path, engine, model_id)
+            if suggestions:
+                with open(file_path, 'r') as f:
+                    original_code = f.read()
+                new_code = replace_suggestion(ast.parse(original_code), suggestions, original_code)
+                with open(file_path, "w") as f:
+                    f.write(new_code)
+                    logging.info("Improved file: %s", file_path)
+        except Exception as e:
+            logging.error("Error processing file %s: %s", file_path, e)
+            continue
+        try:
+            output = execute_code(file_path)
+            logging.debug("Output of %s: %s", file_path, output)
+        except Exception as e:
+            logging.error("Error executing file %s: %s", file_path, e)
+            continue
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    improve_python_files(python_root, 'davinci-codex', model_id)

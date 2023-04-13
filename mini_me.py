@@ -1,146 +1,92 @@
-# Cleaned up code with all of the suggested improvements
+import ast
+import os
+import subprocess
+import openai
+import shutil
+import nltk
+import argparse
 
-# Define a function to process a file
-def process_file(file_path):
-    # Open the file for reading
-    with open(file_path, 'r') as f:
-        # Read the contents of the file
-        content = f.read()
-
-    # Remove unnecessary comments and print statements for clarity and simplicity.
-    pattern = r'(\\[\'\"\\]).*\n|#[^\n]*\n|print[\s\S]*?\n'
-    content = re.sub(pattern, '', content)
-
-    # Add more exception handling and error checking to make the code more robust.
-    try:
-        # Split the content into lines
-        lines = content.split('\n')
-
-        # Initialize the counts dictionary
-        counts = {}
-
-        # Count the number of occurrences of each word
-        for line in lines:
-            for word in line.split():
-                if word in counts:
-                    counts[word] += 1
-                else:
-                    counts[word] = 1
-
-        # Sort the counts dictionary by descending order of frequency
-        sorted_counts = sorted(counts.items(), key=lambda x: x[1], reverse=True)
-
-        # Return the sorted counts dictionary
-        return dict(sorted_counts)
-
-    except Exception as e:
-        # Print an error message
-        print(f'Error processing file {file_path}: {e}')
-
-# Refactor the code to separate the logic into smaller functions that are easier to understand.
-def process_folder(folder_path):
-    # Get the list of files in the folder
-    files = os.listdir(folder_path)
-
-    # Process each file in the folder
-    for file in files:
-        # Construct the full path to the file
-        file_path = os.path.join(folder_path, file)
-
-        # Check if the file is a directory
-        if os.path.isdir(file_path):
-            # Recursively process subdirectories
-            process_folder(file_path)
-        else:
-            # Process the file
-            counts = process_file(file_path)
-
-            # Write the counts to a new file with a ".counts" extension
-            with open(file_path + '.counts', 'w') as f:
-                for word, count in counts.items():
-                    f.write(f'{word}: {count}\n')
-
-# Add more documentation and docstrings to the code to explain what it does and how to use it.
-def main():
-    """Main function to process a folder"""
-    folder_path = input('Enter the folder path: ')
-    process_folder(folder_path)
-
-# Improve the formatting of the code to make it more readable and consistent.
-if __name__ == '__main__':
-    main()
-
-# Use constants or variables instead of hard-coding values to make the code easier to modify in the future.
-FILE_EXTENSION = '.counts'
-PROMPT_MESSAGE = 'Enter the root folder path: '
-ERROR_MESSAGE = 'Error processing file {}: {}'
-
-def process_file(file_path):
-    # Open the file for reading
-    with open(file_path, 'r') as f:
-        # Read the contents of the file
-        content = f.read()
-
-    # Remove unnecessary comments and print statements for clarity and simplicity.
-    pattern = r'(\\[\'\"\\]).*\n|#[^\n]*\n|print[\s\S]*?\n'
-    content = re.sub(pattern, '', content)
-
-    # Add more exception handling and error checking to make the code more robust.
-    try:
-        # Split the content into lines
-        lines = content.split('\n')
-
-        # Initialize the counts dictionary
-        counts = {}
-
-        # Count the number of occurrences of each word
-        for line in lines:
-            for word in line.split():
-                if word in counts:
-                    counts[word] += 1
-                else:
-                    counts[word] = 1
-
-        # Sort the counts dictionary by descending order of frequency
-        sorted_counts = sorted(counts.items(), key=lambda x: x[1], reverse=True)
-
-        # Return the sorted counts dictionary
-        return dict(sorted_counts)
-
-    except Exception as e:
-        # Print an error message
-        print(ERROR_MESSAGE.format(file_path, e))
-
-def process_folder(folder_path):
-    # Get the list of files in the folder
-    files = os.listdir(folder_path)
-
-    # Process each file in the folder
-    for file in files:
-        # Construct the full path to the file
-        file_path = os.path.join(folder_path, file)
-
-        # Check if the file is a directory
-        if os.path.isdir(file_path):
-            # Recursively process subdirectories
-            process_folder(file_path)
-        else:
-            # Process the file
-            counts = process_file(file_path)
-
-            # Write the counts to a new file with the FILE_EXTENSION extension
-            with open(file_path + FILE_EXTENSION, 'w') as f:
-                for word, count in counts.items():
-                    f.write(f'{word}: {count}\n')
+nltk.download('punkt')
 
 
-def main():
-    """Main function to process a folder"""
-    folder_path = input(PROMPT_MESSAGE)
-    process_folder(folder_path)
+# Set up the OpenAI API key and model ID
+openai.api_key = os.environ['OPENAI_API_KEY']
+model_id = 'gpt-3.5-turbo'
 
-if __name__ == '__main__':
-    main()
+# Define a function to get suggestions for a code chunk
+def get_code_suggestions(chunk):
+    system_message = "You analyze code for bugs issues and improvments and make actionable suggestions to improve it. Respond with just a list of improvements. If any of the suggestions require a new file add this tag '<SAVE:filename>' with an appropriate filename relevant to the suggestion."
+    prompt = f"{chunk}\n{placeholder}\n{system_message}"
+    response = openai.Completion.create(
+        engine=model_id,
+        prompt=prompt,
+        max_tokens=200,
+        n=1,
+        stop=None,
+        temperature=0.5,
+    )
 
+    # Process the response and extract the suggestions
+    suggestions = response.choices[0].text
+    suggestions = suggestions.replace(placeholder, '')
+    suggestions = suggestions.strip().split('\n')
+    suggestions = [s.strip() for s in suggestions if s.strip() != '']
+    return suggestions
 
-# Consider using a different approach for saving new files (e.g. providing a directory to save them in) instead of hard-coding the root directory. <SAVE:save_filename.txt>
+# Set up command line argument parser
+parser = argparse.ArgumentParser(description='Generates suggestions for improving code and creates a new Git repository with the improved code.')
+parser.add_argument('dir_path', type=str, help='Path to directory containing the code files to be improved.')
+parser.add_argument('new_repo_path', type=str, help='Path for the new Git repository.')
+args = parser.parse_args()
+
+# Define the placeholder comment
+placeholder = "# <IMPROVEMENTS>"
+
+# Create the new Git repository directory if it doesn't exist
+if not os.path.exists(args.new_repo_path):
+    os.makedirs(args.new_repo_path)
+
+# Initialize a new Git repository or check if it's already a Git repository
+try:
+    subprocess.run(['git', 'init'], cwd=args.new_repo_path, check=True)
+except subprocess.CalledProcessError as e:
+    print(f'Error initializing Git repository: {e}')
+    exit(1)
+
+# Traverse the directory and read in the code files
+for root, dirs, files in os.walk(args.dir_path):
+    for filename in files:
+        if filename.endswith('.py'):
+            with open(os.path.join(root, filename)) as f:
+                original_code = f.read()
+
+            # Use GPT-3.5-Turbo to analyze the code and generate suggestions for improvement
+            suggestions = get_code_suggestions(original_code)
+
+            # Create a new file with the suggested filename and write the suggested code to it
+            for suggestion in suggestions:
+                if suggestion.startswith('<SAVE:'):
+                    filename = suggestion.split(':', 1)[1].strip('>')
+                    new_filepath = os.path.join(args.new_repo_path, filename)
+                    with open(new_filepath, 'w') as f:
+                        f.write(suggestion)
+                        print(f'Created new file at {new_filepath}')
+
+            # Update the original code with the suggestions
+            for suggestion in suggestions:
+                if not suggestion.startswith('<SAVE:'):
+                    replacer = CodeReplacer(placeholder, suggestion)
+                    new_code = ast.fix_missing_locations(replacer.visit(ast.parse(original_code)))
+                    original_code = ast.unparse(new_code)
+
+            # Write the improved code to the new Git repository
+            new_filepath = os.path.join(args.new_repo_path, filename)
+            with open(new_filepath, 'w') as f:
+                f.write(original_code)
+                print(f'Copied {filename} to {new_filepath}')
+
+            # Add the file to the Git repository
+            try:
+                subprocess.run(['git', 'add', new_filepath], cwd=args.new_repo_path, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f'Error adding file {new_filepath} to Git repository: {e}')

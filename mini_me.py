@@ -5,16 +5,14 @@ import subprocess
 from pathlib import Path
 import openai
 
-# Set OpenAI API key and GPT model ID
 openai.api_key = 'shdkdaa'
 model_id = 'gpt-3.5-turbo'
 
-# Set root path for directory to be improved
 root_path = Path('/Users/paul/AI/AGI')
 
 def replace_code(node, suggestions, original_code):
     """
-    Replaces a suggestion within original code using its start and end indices.
+    Replaces a suggestion within the original code using its start and end indices.
 
     Args:
         node (ast.AST): A node object in the abstract syntax tree of the code
@@ -83,9 +81,8 @@ def run_code(file_path):
 
 def improve_code(root_path, engine, model_id):
     """
-    Walks through all Python files within the directory and any subdirectories.
-    Analyzes the code for each file and replaces any suggestions made by OpenAI.
-    Executes the improved code and logs the output.
+    Walks through all Python files within the directory and any subdirectories, analyzes the code for each file
+    and replaces any suggestions made by OpenAI, executes the improved code and logs the output.
 
     Args:
         root_path (str): The root directory containing the Python files to be improved
@@ -100,16 +97,18 @@ def improve_code(root_path, engine, model_id):
             suggestions_log.add(suggestions)
             logging.info(f'Suggestions for {file_path.name}: {suggestions}')
             try:
-                tree = ast.parse(file_path.read_text())
+                with open(file_path, 'r') as f:
+                    original_code = f.read()
+            except FileNotFoundError as e:
+                logging.error(f'{file_path} not found: {e}')
+                continue
+            try:
+                tree = ast.parse(original_code)
             except SyntaxError as e:
                 logging.error(f'Error parsing "{file_path}": {e}')
                 continue
-            new_code = replace_code(tree, suggestions, file_path.read_text())
-            file_path.write_text(new_code)
-            output = run_code(file_path)
-            logging.info(f'Output for {file_path.name}:')
-            logging.info('-' * 20)
-            logging.info(output)
-
-if __name__ == '__main__':
-    improve_code(root_path, engine=model_id, model_id=model_id)
+            new_code = replace_code(tree, suggestions, original_code)
+            try:
+                with open(file_path, 'w') as f:
+                    f.write(new_code)
+            except PermissionError as e

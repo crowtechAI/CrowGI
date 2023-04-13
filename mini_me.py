@@ -8,9 +8,9 @@ import openai
 openai.api_key = 'shdkdaa'
 model_id = 'gpt-3.5-turbo'
 
-root_path = Path('/Users/paul/AI/AGI')
+python_root = Path('/Users/paul/AI/AGI')
 
-def replace_code(node, suggestions, original_code):
+def replace_suggestion(node, suggestions, original_code):
     """
     Replaces a suggestion within the original code using its start and end indices.
 
@@ -26,9 +26,9 @@ def replace_code(node, suggestions, original_code):
         for (field, value) in ast.iter_fields(node):
             if isinstance(value, list):
                 for item in value:
-                    replace_code(item, suggestions, original_code)
+                    replace_suggestion(item, suggestions, original_code)
             elif isinstance(value, ast.AST):
-                replace_code(value, suggestions, original_code)
+                replace_suggestion(value, suggestions, original_code)
             elif isinstance(value, str) and value == suggestions:
                 start_index = node.col_offset
                 end_index = start_index + len(suggestions)
@@ -63,7 +63,7 @@ def analyze_code(file_path, engine, model_id):
     suggestions = completion.choices[0].text.strip()
     return suggestions
 
-def run_code(file_path):
+def execute_code(file_path):
     """
     Executes and returns the output of a Python file.
 
@@ -79,36 +79,7 @@ def run_code(file_path):
         output += result.stderr
     return output
 
-def improve_code(root_path, engine, model_id):
+def improve_python_files(root_path: Path, engine: str, model_id: str) -> None:
     """
     Walks through all Python files within the directory and any subdirectories, analyzes the code for each file
-    and replaces any suggestions made by OpenAI, executes the improved code and logs the output.
-
-    Args:
-        root_path (str): The root directory containing the Python files to be improved
-        engine (str): The OpenAI engine to be used for code analysis
-        model_id (str): The ID for the GPT-3 model to be used for code analysis
-    """
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')
-    suggestions_log = set()
-    for file_path in root_path.glob('**/*.py'):
-        suggestions = analyze_code(file_path, engine, model_id)
-        if suggestions not in suggestions_log:
-            suggestions_log.add(suggestions)
-            logging.info(f'Suggestions for {file_path.name}: {suggestions}')
-            try:
-                with open(file_path, 'r') as f:
-                    original_code = f.read()
-            except FileNotFoundError as e:
-                logging.error(f'{file_path} not found: {e}')
-                continue
-            try:
-                tree = ast.parse(original_code)
-            except SyntaxError as e:
-                logging.error(f'Error parsing "{file_path}": {e}')
-                continue
-            new_code = replace_code(tree, suggestions, original_code)
-            try:
-                with open(file_path, 'w') as f:
-                    f.write(new_code)
-            except PermissionError as e
+    and replaces any suggestions

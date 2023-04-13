@@ -4,7 +4,6 @@ import os
 import subprocess
 from pathlib import Path
 import openai
-
 openai.api_key = 'shdkdaa'
 model_id = 'gpt-3.5-turbo'
 root_path = Path('/Users/paul/AI/AGI')
@@ -81,6 +80,5 @@ def improve_code(root_path):
             logging.info(f'Output for {file_path.name}:')
             logging.info('-' * 20)
             logging.info(output)
-
 if __name__ == '__main__':
     improve_code(root_path)

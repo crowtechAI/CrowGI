@@ -6,8 +6,11 @@ import shutil
 import re
 
 def has_unterminated_string_literal(code):
-    matches = re.findall('([\'\\"])(?:(?=(\\\\?))\\2.)*?\\1', code)
-    return len(matches) != len(re.findall('\'\'\'|\\"\\"\\"', code))
+    single_quotes = re.findall("(?<!\\\\)'", code)
+    double_quotes = re.findall('(?<!\\\\)"', code)
+    triple_single_quotes = re.findall("'''", code)
+    triple_double_quotes = re.findall('"""', code)
+    return (len(single_quotes) % 2 != 0 or len(double_quotes) % 2 != 0) and (len(triple_single_quotes) % 2 == 0 and len(triple_double_quotes) % 2 == 0)
 openai_api_key = os.environ['OPENAI_API_KEY']
 model_id = 'gpt-3.5-turbo'
 dir_path = '/Users/paul/AI/AGI/CrowGI'
@@ -34,16 +37,18 @@ for (root, dirs, files) in os.walk(dir_path):
             if has_unterminated_string_literal(original_code):
                 print(f'Skipping {filename} due to unterminated string literal')
                 continue
-                print(f'Generating suggestions for {filename}')
-                system_message = "You Analyze code for bugs issues and improvements and make actionable suggestions to improve it. respond with just a list of improvements. if any of the suggestions require a new file add this tag '<SAVE:filename>' with an appropriate filename relevant to the suggestion."
-                prompt = original_code
-                completion = openai.ChatCompletion.create(model=model_id, messages=[{'role': 'system', 'content': system_message}, {'role': 'user', 'content': prompt}])
-                suggestions = completion.choices[0].message.content.strip()
-                print(f'Generating code snippets for {filename}')
-                system_message = f'generate code snippets that implement the improvements listed here: {suggestions} and indicate where the changes should be made in the original code.'
-                prompt = f'{suggestions}'
-                completion = openai.ChatCompletion.create(model=model_id, messages=[{'role': 'system', 'content': system_message}, {'role': 'user', 'content': prompt}])
-                code_snippets = completion.choices[0].message.content.strip()
+            print(f'Generating suggestions for {filename}')
+            system_message = "You Analyze code for bugs issues and improvements and make actionable suggestions to improve it. respond with just a list of improvements. if any of the suggestions require a new file add this tag '<SAVE:filename>' with an appropriate filename relevant to the suggestion."
+            prompt = original_code
+            completion = openai.ChatCompletion.create(model=model_id, messages=[{'role': 'system', 'content': system_message}, {'role': 'user', 'content': prompt}])
+            suggestions = completion.choices[0].message.content.strip()
+            print(suggestions)
+            print(f'Generating code snippets for {filename}')
+            system_message = f'generate code snippets that implement the improvements listed here: {suggestions} and indicate where the changes should be made in the original code.'
+            prompt = f'{suggestions}'
+            completion = openai.ChatCompletion.create(model=model_id, messages=[{'role': 'system', 'content': system_message}, {'role': 'user', 'content': prompt}])
+            code_snippets = completion.choices[0].message.content.strip()
+            print(code_snippets)
             print(f'Replacing original code with generated code snippets for {filename}')
             replacer = CodeReplacer(placeholder, code_snippets)
             updated_ast = replacer.visit(ast.parse(original_code))

@@ -1,0 +1,2 @@
+<link rel="stylesheet" href="<?php echo e(asset('vendor/css/daterangepicker.css')); ?>">
+<?php /**PATH /home/u793119200/domains/cakekrate.com/public_html/crowtech/resources/views/sections/daterange_css.blade.php ENDPATH**/ ?>
